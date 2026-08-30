@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react"
-import { Edit, Folder, Globe, Plus, ScrollText, Trash2 } from "lucide-react"
+import { Edit, Folder, Globe, Plus, ScrollText, Trash2, Coins, AlertCircle } from "lucide-react"
 
 import type { RuleMetadata } from "@roo-code/types"
 
+import { cn } from "@/lib/utils"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import {
@@ -22,6 +23,19 @@ import { vscode } from "@/utils/vscode"
 import { SectionHeader } from "./SectionHeader"
 import { CreateRuleDialog } from "./CreateRuleDialog"
 
+/**
+ * Estimate token count for a text string using standard word+punctuation+newline heuristic.
+ */
+export function estimateStringTokens(text: string): number {
+	if (!text) return 0
+	const words = text.split(/\s+/).filter(Boolean).length
+	const punctuation = (text.match(/[.,!?;:()[\]{}""''`<>_=-]/g) || []).length
+	const newlines = (text.match(/\n/g) || []).length
+	const wordBased = Math.round(words * 1.3 + punctuation * 0.3 + newlines * 0.5)
+	const charBased = Math.ceil(text.length / 3.8)
+	return Math.max(1, Math.max(wordBased, charBased))
+}
+
 export const RulesSettings: React.FC = () => {
 	const { t } = useAppTranslation()
 	const { cwd, rules: rawRules } = useExtensionState()
@@ -40,6 +54,18 @@ export const RulesSettings: React.FC = () => {
 	useEffect(() => {
 		handleRefresh()
 	}, [handleRefresh])
+
+	// Filter error vs valid rules
+	const errorRules = useMemo(() => rules.filter((r) => Boolean(r.error)), [rules])
+	const validRules = useMemo(() => rules.filter((r) => !r.error), [rules])
+
+	// Total token tally across valid rules
+	const totalRuleTokens = useMemo(() => {
+		return validRules.reduce((acc, rule) => {
+			const text = rule.content || rule.name || ""
+			return acc + estimateStringTokens(text)
+		}, 0)
+	}, [validRules])
 
 	const handleDeleteClick = useCallback((rule: RuleMetadata) => {
 		setRuleToDelete(rule)
@@ -87,43 +113,89 @@ export const RulesSettings: React.FC = () => {
 	const globalRules = useMemo(() => rules.filter((rule) => rule.scope === "global"), [rules])
 
 	const renderRuleItem = useCallback(
-		(rule: RuleMetadata) => (
-			<div key={rule.id} className="p-2.5 px-2 rounded-xl border border-transparent">
-				<div className="flex items-start justify-between gap-2 flex-col min-[400px]:flex-row overflow-hidden">
-					<div className="flex-1 min-w-0">
-						<div className="flex items-center gap-2 overflow-hidden">
-							<span className="font-medium truncate">{rule.name}</span>
-							<span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-vscode-badge-background text-vscode-badge-foreground shrink-0">
-								{rule.kind === "mode"
-									? t("settings:rules.kind.modeBadge")
-									: t("settings:rules.kind.genericBadge")}
-							</span>
-						</div>
-						<div className="text-xs text-vscode-descriptionForeground mt-1 truncate">
-							{rule.relativePath}
-						</div>
-						{rule.kind === "mode" && (
-							<div className="text-xs text-vscode-descriptionForeground mt-1">
-								{t("settings:rules.modeLabel", { mode: rule.modeName ?? rule.modeSlug })}
-							</div>
-						)}
-					</div>
+		(rule: RuleMetadata) => {
+			const isError = Boolean(rule.error)
+			const content = rule.content || ""
+			const tokenCount = !isError ? estimateStringTokens(content) : 0
+			const charCount = rule.charCount ?? content.length
 
-					<div className="flex items-center gap-1 px-0 ml-0 min-[400px]:ml-0 min-[400px]:mt-2 flex-shrink-0">
-						<StandardTooltip content={t("settings:rules.editRule")}>
-							<Button variant="ghost" size="icon" onClick={() => handleEditClick(rule)}>
-								<Edit />
-							</Button>
-						</StandardTooltip>
-						<StandardTooltip content={t("settings:rules.deleteRule")}>
-							<Button variant="ghost" size="icon" onClick={() => handleDeleteClick(rule)}>
-								<Trash2 className="text-destructive" />
-							</Button>
-						</StandardTooltip>
+			return (
+				<div
+					key={rule.id}
+					className={cn(
+						"p-2.5 px-2 rounded-xl border transition-colors",
+						isError
+							? "border-destructive/40 bg-destructive/5 hover:border-destructive/60"
+							: "border-transparent hover:bg-vscode-list-hoverBackground/30",
+					)}>
+					<div className="flex items-start justify-between gap-2 flex-col min-[400px]:flex-row overflow-hidden">
+						<div className="flex-1 min-w-0">
+							{/* Rule Name & Badges */}
+							<div className="flex items-center gap-2 overflow-hidden flex-wrap">
+								<span
+									className={cn("font-medium truncate", isError && "text-destructive font-semibold")}>
+									{rule.name}
+								</span>
+								<span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-vscode-badge-background text-vscode-badge-foreground shrink-0">
+									{rule.kind === "mode"
+										? t("settings:rules.kind.modeBadge")
+										: t("settings:rules.kind.genericBadge")}
+								</span>
+								{isError ? (
+									<span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-destructive/20 text-destructive border border-destructive/30 flex items-center gap-1">
+										<AlertCircle className="size-3 shrink-0" />
+										{t("settings:rules.failedToLoadBadge")}
+									</span>
+								) : (
+									<StandardTooltip
+										content={t("settings:rules.tokenTooltip", {
+											tokens: tokenCount,
+											chars: charCount,
+										})}>
+										<span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-vscode-badge-background/20 text-vscode-descriptionForeground border border-vscode-badge-background/30 flex items-center gap-1 cursor-help">
+											<Coins className="size-3 shrink-0 text-vscode-descriptionForeground opacity-70" />
+											~{tokenCount} tok
+										</span>
+									</StandardTooltip>
+								)}
+							</div>
+
+							{/* Rule Path or Error Diagnostic */}
+							{isError ? (
+								<div className="text-xs text-destructive mt-1 flex items-start gap-1 font-mono break-all">
+									<span>{rule.error}</span>
+								</div>
+							) : (
+								<div className="text-xs text-vscode-descriptionForeground mt-1 truncate">
+									{rule.relativePath}
+								</div>
+							)}
+
+							{rule.kind === "mode" && !isError && (
+								<div className="text-xs text-vscode-descriptionForeground mt-1">
+									{t("settings:rules.modeLabel", { mode: rule.modeName ?? rule.modeSlug })}
+								</div>
+							)}
+						</div>
+
+						{/* Actions */}
+						<div className="flex items-center gap-1 px-0 ml-0 min-[400px]:ml-0 min-[400px]:mt-2 flex-shrink-0">
+							<StandardTooltip
+								content={isError ? t("settings:rules.editBrokenRule") : t("settings:rules.editRule")}>
+								<Button variant="ghost" size="icon" onClick={() => handleEditClick(rule)}>
+									<Edit />
+								</Button>
+							</StandardTooltip>
+							<StandardTooltip content={t("settings:rules.deleteRule")}>
+								<Button variant="ghost" size="icon" onClick={() => handleDeleteClick(rule)}>
+									<Trash2 className="text-destructive" />
+								</Button>
+							</StandardTooltip>
+						</div>
 					</div>
 				</div>
-			</div>
-		),
+			)
+		},
 		[t, handleDeleteClick, handleEditClick],
 	)
 
@@ -133,6 +205,35 @@ export const RulesSettings: React.FC = () => {
 				<SectionHeader>{t("settings:sections.rules")}</SectionHeader>
 				<div className="flex flex-col gap-2 px-5 py-2">
 					<p className="text-vscode-descriptionForeground text-sm m-0">{t("settings:rules.description")}</p>
+
+					{/* Error Alert Banner */}
+					{errorRules.length > 0 && (
+						<div className="flex items-center gap-1.5 text-xs text-destructive font-medium">
+							<AlertCircle className="size-3.5 shrink-0" />
+							{t("settings:rules.rulesFailedCount", { count: errorRules.length })}
+						</div>
+					)}
+
+					{/* Total Token Tally Card */}
+					{validRules.length > 0 && (
+						<div className="flex items-center justify-between p-2 px-3 rounded-lg bg-vscode-textBlockQuote-background/40 border border-vscode-widget-border text-xs">
+							<div className="flex items-center gap-2">
+								<Coins className="size-4 text-vscode-textLink-foreground shrink-0" />
+								<div>
+									<span className="font-medium text-vscode-foreground">
+										{t("settings:rules.totalTokenTally", { count: totalRuleTokens })}
+									</span>
+									<span className="text-vscode-descriptionForeground ml-1.5">
+										({t("settings:rules.totalTokenBreakdown", { count: validRules.length })})
+									</span>
+								</div>
+							</div>
+							<span className="text-[11px] text-vscode-descriptionForeground font-mono font-medium">
+								~{totalRuleTokens} tok
+							</span>
+						</div>
+					)}
+
 					<Button variant="secondary" className="py-1" onClick={() => setCreateDialogOpen(true)}>
 						<Plus />
 						{t("settings:rules.addRule")}

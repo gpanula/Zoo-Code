@@ -10,6 +10,12 @@
 		"editProjectModes": "Edit Project Modes (.roomodes)",
 		"createModeHelpText": "Modes are specialized personas that tailor Zoo's behavior. <0>Learn about Using Modes</0> or <1>Customizing Modes.</1>",
 		"selectMode": "Search modes",
+		"totalTokenTally": "~{{count}} total prompt tokens",
+		"tokenSummary": "~{{role}} role, ~{{instructions}} instructions",
+		"tokenBreakdownTitle": "Prompt Breakdown for {{mode}}",
+		"tokenSectionRules": "Rules & Objective",
+		"tokenSectionSkills": "Active Skills ({{count}})",
+		"tokenSectionGlobal": "Global Instructions",
 		"noMatchFound": "No modes found"
 	},
 	"apiConfiguration": {

@@ -130,7 +130,17 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 	const { t } = useAppTranslation()
 
 	const extensionState = useExtensionState()
-	const { currentApiConfigName, listApiConfigMeta, uriScheme, settingsImportedAt, mode } = extensionState
+	const {
+		currentApiConfigName,
+		listApiConfigMeta,
+		uriScheme,
+		settingsImportedAt,
+		mode,
+		skills,
+		rules,
+		commands,
+		maxSkillDescriptionLength: stateMaxLength,
+	} = extensionState
 
 	const [isDiscardDialogShow, setDiscardDialogShow] = useState(false)
 	const [isChangeDetected, setChangeDetected] = useState(false)
@@ -152,6 +162,25 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 	const confirmDialogHandler = useRef<() => void>()
 
 	const [cachedState, setCachedState] = useState(() => extensionState)
+
+	const maxDescLimit = cachedState.maxSkillDescriptionLength ?? stateMaxLength ?? 256
+	const hasFailedSkills = useMemo(() => {
+		return (skills ?? []).some((s) => Boolean(s.error))
+	}, [skills])
+	const hasFailedRules = useMemo(() => {
+		return (rules ?? []).some((r) => Boolean(r.error))
+	}, [rules])
+	const hasFailedCommands = useMemo(() => {
+		return (commands ?? []).some((c) => Boolean(c.error))
+	}, [commands])
+	const hasTruncatedSkills = useMemo(() => {
+		if (!skills || skills.length === 0) return false
+		return skills.some((s) => {
+			if (s.error) return false
+			const text = (s.summary?.trim() || s.description || "").replace(/\s+/g, " ").trim()
+			return text.length > maxDescLimit
+		})
+	}, [skills, maxDescLimit])
 
 	const {
 		alwaysAllowReadOnly,
@@ -198,6 +227,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		diffFuzzyThreshold,
 		showRooIgnoredFiles,
 		enableSubfolderRules,
+		maxSkillDescriptionLength,
 		maxImageFileSize,
 		maxTotalImageSize,
 		customSupportPrompts,
@@ -427,6 +457,7 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					maxWorkspaceFiles: Math.min(Math.max(0, maxWorkspaceFiles ?? 200), 500),
 					showRooIgnoredFiles: showRooIgnoredFiles ?? true,
 					enableSubfolderRules: enableSubfolderRules ?? false,
+					maxSkillDescriptionLength: maxSkillDescriptionLength ?? 256,
 					maxImageFileSize: maxImageFileSize ?? 5,
 					maxTotalImageSize: maxTotalImageSize ?? 20,
 					includeDiagnosticMessages:
@@ -712,6 +743,11 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 					{sections.map(({ id, icon: Icon }) => {
 						const isSelected = id === activeTab
 						const onSelect = () => handleTabChange(id)
+						const isSkillsWithFailed = id === "skills" && hasFailedSkills
+						const isRulesWithFailed = id === "rules" && hasFailedRules
+						const isCommandsWithFailed = id === "slashCommands" && hasFailedCommands
+						const isFailedTab = isSkillsWithFailed || isRulesWithFailed || isCommandsWithFailed
+						const isSkillsWithTruncation = id === "skills" && !hasFailedSkills && hasTruncatedSkills
 
 						// Base TabTrigger component definition
 						// We pass isSelected manually for styling, but onSelect is handled conditionally
@@ -724,13 +760,45 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 									isSelected // Use manual isSelected for styling
 										? `${settingsTabTrigger} ${settingsTabTriggerActive}`
 										: settingsTabTrigger,
+									isFailedTab &&
+										!isSelected &&
+										"text-destructive hover:text-destructive/80 opacity-90",
+									isSkillsWithTruncation &&
+										!isSelected &&
+										"text-amber-500 hover:text-amber-400 opacity-90",
 									"cursor-pointer focus:ring-0", // Remove the focus ring styling
 								)}
 								data-testid={`tab-${id}`}
 								data-compact={isCompactMode}>
-								<div className={cn("flex items-center gap-2", isCompactMode && "justify-center")}>
-									<Icon className="w-4 h-4" />
-									<span className="tab-label">{t(`settings:sections.${id}`)}</span>
+								<div
+									className={cn("flex items-center gap-2 w-full", isCompactMode && "justify-center")}>
+									<Icon
+										className={cn(
+											"w-4 h-4 shrink-0",
+											isFailedTab && "text-destructive",
+											isSkillsWithTruncation && "text-amber-500",
+										)}
+									/>
+									<span
+										className={cn(
+											"tab-label truncate",
+											isFailedTab && "text-destructive font-semibold",
+											isSkillsWithTruncation && "text-amber-500 font-medium",
+										)}>
+										{t(`settings:sections.${id}`)}
+									</span>
+									{isFailedTab && !isCompactMode && (
+										<span
+											className="size-1.5 rounded-full bg-destructive ml-auto shrink-0"
+											title={`${id === "skills" ? "Skills" : id === "rules" ? "Rules" : "Slash Commands"} failed to load`}
+										/>
+									)}
+									{isSkillsWithTruncation && !isCompactMode && (
+										<span
+											className="size-1.5 rounded-full bg-amber-500 ml-auto shrink-0"
+											title="Skills truncated"
+										/>
+									)}
 								</div>
 							</TabTrigger>
 						)
@@ -745,7 +813,19 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 											{React.cloneElement(triggerComponent)}
 										</TooltipTrigger>
 										<TooltipContent side="right" className="text-base">
-											<p className="m-0">{t(`settings:sections.${id}`)}</p>
+											<p className="m-0 flex items-center gap-1.5">
+												{t(`settings:sections.${id}`)}
+												{isFailedTab && (
+													<span className="text-xs text-destructive font-medium">
+														(Errors)
+													</span>
+												)}
+												{isSkillsWithTruncation && (
+													<span className="text-xs text-amber-500 font-medium">
+														(Truncated)
+													</span>
+												)}
+											</p>
 										</TooltipContent>
 									</Tooltip>
 								</TooltipProvider>
@@ -837,7 +917,12 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 						{renderTab === "slashCommands" && <SlashCommandsSettings />}
 
 						{/* Skills Section */}
-						{renderTab === "skills" && <SkillsSettings />}
+						{renderTab === "skills" && (
+							<SkillsSettings
+								setCachedStateField={setCachedStateField}
+								maxSkillDescriptionLength={maxSkillDescriptionLength}
+							/>
+						)}
 
 						{/* Rules Section */}
 						{renderTab === "rules" && <RulesSettings />}

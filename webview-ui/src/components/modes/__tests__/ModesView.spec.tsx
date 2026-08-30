@@ -264,4 +264,10 @@ describe("PromptsView", () => {
 		// Verify popover remains closed
 		expect(selectTrigger).toHaveAttribute("aria-expanded", "false")
 	})
+	it("renders mode token tally card with section breakdown", () => {
+		renderPromptsView()
+
+		expect(screen.getByTestId("mode-token-tally-card")).toBeInTheDocument()
+		expect(screen.getByText(/~[0-9]+ tok \/ prompt/)).toBeInTheDocument()
+	})
 })

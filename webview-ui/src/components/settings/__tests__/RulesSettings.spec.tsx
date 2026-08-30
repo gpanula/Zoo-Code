@@ -215,4 +215,35 @@ describe("RulesSettings", () => {
 		)
 		expect(requestCalls).toHaveLength(1)
 	})
+	it("renders token indicator on rules and total token tally", () => {
+		renderRulesSettings()
+
+		// Should render token badges for valid rules
+		const tokenBadges = screen.getAllByText(/~\d+ tok/)
+		expect(tokenBadges.length).toBeGreaterThan(0)
+
+		// Should render total token tally card in header
+		expect(screen.getByText(/settings:rules.totalTokenTally/)).toBeInTheDocument()
+	})
+
+	it("renders failed-to-load badge and inline error diagnostic for broken rules", () => {
+		const rulesWithErrors: RuleMetadata[] = [
+			{
+				id: "project:generic:generic:broken-rule.md",
+				name: "broken-rule.md",
+				scope: "project",
+				kind: "generic",
+				filePath: "/workspace/.roo/rules/broken-rule.md",
+				relativePath: "broken-rule.md",
+				directoryPath: "/workspace/.roo/rules",
+				error: "EACCES: permission denied, open '/workspace/.roo/rules/broken-rule.md'",
+			},
+		]
+
+		renderRulesSettings(rulesWithErrors)
+
+		expect(screen.getByText("settings:rules.failedToLoadBadge")).toBeInTheDocument()
+		expect(screen.getByText(/EACCES: permission denied/)).toBeInTheDocument()
+		expect(screen.getByText(/settings:rules.rulesFailedCount/)).toBeInTheDocument()
+	})
 })

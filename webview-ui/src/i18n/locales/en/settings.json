@@ -84,6 +84,9 @@
 		}
 	},
 	"slashCommands": {
+		"failedToLoadBadge": "Failed to load",
+		"commandsFailedCount": "{{count}} slash command(s) failed to load",
+		"editBrokenCommand": "Edit broken command file",
 		"description": "Slash commands are shortcuts for reusable workflows and actions to be used on demand (like creating a PR, running a set of tasks, etc). <DocsLink>Learn more</DocsLink>",
 		"workspaceCommands": "Workspace Commands",
 		"globalCommands": "Global Commands",
@@ -119,6 +122,12 @@
 		"footer": "Use slash commands for quick access to frequently used prompts and workflows."
 	},
 	"rules": {
+		"totalTokenTally": "~{{count}} tokens added to system prompt",
+		"totalTokenBreakdown": "~{{count}} active rules in prompt",
+		"tokenTooltip": "Rule token footprint: ~{{tokens}} tokens ({{chars}} chars)",
+		"failedToLoadBadge": "Failed to load",
+		"rulesFailedCount": "{{count}} rule(s) failed to load and were disabled in prompts",
+		"editBrokenRule": "Edit broken rule file",
 		"description": "Manage Zoo Code rule files from global and workspace .roo/rules directories. Create general rules or mode-specific rules without manually browsing configuration folders.",
 		"workspaceRules": "Workspace Rules",
 		"globalRules": "Global Rules",
@@ -165,6 +174,22 @@
 		"footer": "Rules load mode-specific guidance before general guidance. Global rules load before workspace rules."
 	},
 	"skills": {
+		"totalTokenTally": "~{{count}} tokens added to system prompt",
+		"totalTokenBreakdown": "~{{descTokens}} tokens across {{count}} skill descriptions",
+		"tokenTooltip": "Total footprint: ~{{totalTokens}} tokens (~{{descTokens}} description, ~{{metaTokens}} name, path & XML tags)",
+		"tokenBadge": "~{{tokens}} tok",
+		"failedToLoadBadge": "Failed to load",
+		"skillsFailedCount": "{{count}} skill failed to load and was disabled in prompts",
+		"skillsFailedCount_other": "{{count}} skills failed to load and were disabled in prompts",
+		"editBrokenSkill": "Open SKILL.md to fix errors",
+		"allSkillsFit": "All {{total}} skills fit within the {{limit}}-character prompt limit.",
+		"skillsTruncated": "{{count}} of {{total}} skills exceed {{limit}} characters and are truncated in prompts.",
+		"truncatedBadge": "Truncated ({{length}}/{{limit}})",
+		"truncatedTooltip": "Exceeds the {{limit}}-character prompt limit ({{length}} chars). Add an explicit 'summary:' in SKILL.md or increase the limit.",
+		"maxDescriptionLength": {
+			"label": "Max skill description length",
+			"description": "Maximum character length for skill descriptions embedded in the system prompt to minimize context token consumption while preserving intent triggers. Compliant with the <SpecLink>Agent Skills Specification</SpecLink> (default: 256, max: 1024)."
+		},
 		"description": "Skills encapsulate contextual instructions and workflows, which the agent can load on-demand. They can include general instructions, specific workflows and even scripts to be run as needed. <DocsLink>Learn more</DocsLink>",
 		"workspaceSkills": "Workspace Skills",
 		"globalSkills": "Global Skills",

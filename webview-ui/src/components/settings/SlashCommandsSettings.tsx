@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react"
-import { Plus, Globe, Folder, Edit, Trash2 } from "lucide-react"
+import React, { useState, useCallback, useMemo, useEffect } from "react"
+import { Plus, Globe, Folder, Edit, Trash2, AlertCircle } from "lucide-react"
 import { Trans } from "react-i18next"
 
 import type { Command } from "@roo-code/types"
 
+import { cn } from "@/lib/utils"
 import { useAppTranslation } from "@/i18n/TranslationContext"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import {
@@ -44,6 +45,9 @@ export const SlashCommandsSettings: React.FC = () => {
 	useEffect(() => {
 		handleRefresh()
 	}, [handleRefresh])
+
+	// Filter error vs valid commands
+	const errorCommands = useMemo(() => commands.filter((cmd) => Boolean(cmd.error)), [commands])
 
 	const handleDeleteClick = useCallback((command: Command) => {
 		setCommandToDelete(command)
@@ -98,28 +102,55 @@ export const SlashCommandsSettings: React.FC = () => {
 	const renderCommandItem = useCallback(
 		(command: Command) => {
 			const isBuiltIn = command.source === "built-in"
+			const isError = Boolean(command.error)
 
 			return (
 				<div
 					key={`${command.source}-${command.name}`}
-					className="p-2.5 px-2 rounded-xl border border-transparent">
+					className={cn(
+						"p-2.5 px-2 rounded-xl border transition-colors",
+						isError
+							? "border-destructive/40 bg-destructive/5 hover:border-destructive/60"
+							: "border-transparent hover:bg-vscode-list-hoverBackground/30",
+					)}>
 					<div className="flex items-start justify-between gap-2 flex-col min-[400px]:flex-row overflow-hidden">
 						<div className="flex-1 min-w-0">
-							{/* Command name */}
-							<div className="flex items-center gap-2 overflow-hidden">
-								<span className="font-medium truncate">{command.name}</span>
+							{/* Command name & Error Badge */}
+							<div className="flex items-center gap-2 overflow-hidden flex-wrap">
+								<span
+									className={cn("font-medium truncate", isError && "text-destructive font-semibold")}>
+									{command.name}
+								</span>
+								{isError && (
+									<span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-destructive/20 text-destructive border border-destructive/30 flex items-center gap-1">
+										<AlertCircle className="size-3 shrink-0" />
+										{t("settings:slashCommands.failedToLoadBadge")}
+									</span>
+								)}
 							</div>
-							{/* Command description */}
-							{command.description && (
-								<div className="text-xs text-vscode-descriptionForeground mt-1 line-clamp-3">
-									{command.description}
+
+							{/* Command description or Error Diagnostic */}
+							{isError ? (
+								<div className="text-xs text-destructive mt-1 flex items-start gap-1 font-mono break-all">
+									<span>{command.error}</span>
 								</div>
+							) : (
+								command.description && (
+									<div className="text-xs text-vscode-descriptionForeground mt-1 line-clamp-3">
+										{command.description}
+									</div>
+								)
 							)}
 						</div>
 
 						{/* Actions */}
 						<div className="flex items-center gap-1 px-0 ml-0 min-[400px]:ml-0 min-[400px]:mt-2 flex-shrink-0">
-							<StandardTooltip content={t("settings:slashCommands.editCommand")}>
+							<StandardTooltip
+								content={
+									isError
+										? t("settings:slashCommands.editBrokenCommand")
+										: t("settings:slashCommands.editCommand")
+								}>
 								<Button variant="ghost" size="icon" onClick={() => handleEditClick(command)}>
 									<Edit />
 								</Button>
@@ -162,6 +193,14 @@ export const SlashCommandsSettings: React.FC = () => {
 							}}
 						/>
 					</p>
+
+					{/* Error Alert Banner */}
+					{errorCommands.length > 0 && (
+						<div className="flex items-center gap-1.5 text-xs text-destructive font-medium">
+							<AlertCircle className="size-3.5 shrink-0" />
+							{t("settings:slashCommands.commandsFailedCount", { count: errorCommands.length })}
+						</div>
+					)}
 
 					{/* Add Command button */}
 					<Button variant="secondary" className="py-1" onClick={() => setCreateDialogOpen(true)}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
 	VSCodeCheckbox,
 	VSCodeRadioGroup,
@@ -8,7 +8,7 @@ import {
 	VSCodeTextField,
 } from "@vscode/webview-ui-toolkit/react"
 import { Trans } from "react-i18next"
-import { ChevronDown, X, Upload, Download } from "lucide-react"
+import { ChevronDown, X, Upload, Download, Coins } from "lucide-react"
 
 import { ModeConfig, GroupEntry, PromptComponent, ToolGroup, modeConfigSchema } from "@roo-code/types"
 
@@ -65,6 +65,19 @@ function getGroupName(group: GroupEntry): ToolGroup {
 	return Array.isArray(group) ? group[0] : group
 }
 
+/**
+ * Estimate token count for a text string using standard word+punctuation+newline heuristic.
+ */
+function estimateStringTokens(text: string): number {
+	if (!text) return 0
+	const words = text.split(/\s+/).filter(Boolean).length
+	const punctuation = (text.match(/[.,!?;:()[\]{}""''`<>_=-]/g) || []).length
+	const newlines = (text.match(/\n/g) || []).length
+	const wordBased = Math.round(words * 1.3 + punctuation * 0.3 + newlines * 0.5)
+	const charBased = Math.ceil(text.length / 3.8)
+	return Math.max(1, Math.max(wordBased, charBased))
+}
+
 const ModesView = () => {
 	const { t } = useAppTranslation()
 
@@ -77,6 +90,7 @@ const ModesView = () => {
 		setCustomInstructions,
 		customModes,
 		mcpServers,
+		skills,
 	} = useExtensionState()
 
 	// Use a local state to track the visually active mode
@@ -88,6 +102,112 @@ const ModesView = () => {
 
 	// Build modes fresh each render so search reflects inline rename updates immediately
 	const modes = getAllModes(customModes)
+
+	// Section token calculations for the currently active mode
+	const modeTokenBreakdown = useMemo(() => {
+		const customMode = findCustomModeBySlug(visualMode, customModes)
+		const prompt = customModePrompts?.[visualMode] as PromptComponent
+		const findMode = (m: ModeConfig): boolean => m.slug === visualMode
+		const currentMode = customModes?.find(findMode) || modes.find(findMode)
+
+		// 1. Role Definition
+		const roleDef = (customMode?.roleDefinition ?? prompt?.roleDefinition ?? getRoleDefinition(visualMode)) || ""
+		const roleTokens = estimateStringTokens(roleDef)
+
+		// 2. Custom Instructions (mode-specific)
+		const modeInstructions =
+			(customMode?.customInstructions ??
+				prompt?.customInstructions ??
+				getCustomInstructions(visualMode, customModes)) ||
+			""
+		const instructionsTokens = estimateStringTokens(modeInstructions)
+
+		// 3. Global Custom Instructions
+		const globalInstructionsTokens = estimateStringTokens(customInstructions || "")
+
+		// 4. Tools & Capabilities
+		const enabledGroups = currentMode?.groups || []
+		const capabilitiesTokens = 320 + enabledGroups.length * 20
+
+		// 5. Rules, System Info & Objective
+		const rulesTokens = 380
+
+		// 6. Active Skills for this mode
+		const modeSkills = (skills || []).filter((s) => {
+			if (s.error) return false
+			if (!s.modeSlugs || s.modeSlugs.length === 0) return true
+			return s.modeSlugs.includes(visualMode)
+		})
+		const skillsTokens =
+			modeSkills.length > 0
+				? modeSkills.reduce((acc, s) => {
+						const desc = (s.summary?.trim() || s.description || "").slice(0, 256)
+						const xml = `  <skill>\n    <name>${s.name}</name>\n    <description>${desc}</description>\n    <location>${s.path}</location>\n  </skill>`
+						return acc + estimateStringTokens(xml)
+					}, 0) + 45
+				: 0
+
+		const totalTokens =
+			roleTokens + instructionsTokens + globalInstructionsTokens + capabilitiesTokens + rulesTokens + skillsTokens
+
+		return {
+			roleTokens,
+			instructionsTokens,
+			globalInstructionsTokens,
+			capabilitiesTokens,
+			rulesTokens,
+			skillsTokens,
+			modeSkillsCount: modeSkills.length,
+			totalTokens,
+		}
+	}, [visualMode, customModes, customModePrompts, modes, customInstructions, skills])
+
+	const calculateModeTokens = useCallback(
+		(modeConfig: ModeConfig) => {
+			const slug = modeConfig.slug
+			const customMode = findCustomModeBySlug(slug, customModes)
+			const prompt = customModePrompts?.[slug] as PromptComponent
+
+			const roleDef = (customMode?.roleDefinition ?? prompt?.roleDefinition ?? getRoleDefinition(slug)) || ""
+			const roleTokens = estimateStringTokens(roleDef)
+
+			const modeInstructions =
+				(customMode?.customInstructions ??
+					prompt?.customInstructions ??
+					getCustomInstructions(slug, customModes)) ||
+				""
+			const instructionsTokens = estimateStringTokens(modeInstructions)
+
+			const globalInstructionsTokens = estimateStringTokens(customInstructions || "")
+			const enabledGroups = modeConfig.groups || []
+			const capabilitiesTokens = 320 + enabledGroups.length * 20
+			const rulesTokens = 380
+
+			const modeSkills = (skills || []).filter((s) => {
+				if (s.error) return false
+				if (!s.modeSlugs || s.modeSlugs.length === 0) return true
+				return s.modeSlugs.includes(slug)
+			})
+			const skillsTokens =
+				modeSkills.length > 0
+					? modeSkills.reduce((acc, s) => {
+							const desc = (s.summary?.trim() || s.description || "").slice(0, 256)
+							const xml = `  <skill>\n    <name>${s.name}</name>\n    <description>${desc}</description>\n    <location>${s.path}</location>\n  </skill>`
+							return acc + estimateStringTokens(xml)
+						}, 0) + 45
+					: 0
+
+			return (
+				roleTokens +
+				instructionsTokens +
+				globalInstructionsTokens +
+				capabilitiesTokens +
+				rulesTokens +
+				skillsTokens
+			)
+		},
+		[customModes, customModePrompts, customInstructions, skills],
+	)
 
 	const [isDialogOpen, setIsDialogOpen] = useState(false)
 	const [selectedPromptContent, setSelectedPromptContent] = useState("")
@@ -830,20 +950,23 @@ const ModesView = () => {
 																		}}>
 																		{modeConfig.name}
 																	</span>
-																	<span
-																		className="text-foreground"
-																		style={{
-																			whiteSpace: "nowrap",
-																			overflow: "hidden",
-																			textOverflow: "ellipsis",
-																			direction: "rtl",
-																			textAlign: "right",
-																			flex: 1,
-																			minWidth: 0,
-																			marginLeft: "0.5em",
-																		}}>
-																		{modeConfig.slug}
-																	</span>
+																	<div className="flex items-center gap-2 shrink-0 ml-2">
+																		<span className="text-[10px] text-vscode-descriptionForeground font-mono opacity-70">
+																			~{calculateModeTokens(modeConfig)} tok
+																		</span>
+																		<span
+																			className="text-foreground"
+																			style={{
+																				whiteSpace: "nowrap",
+																				overflow: "hidden",
+																				textOverflow: "ellipsis",
+																				direction: "rtl",
+																				textAlign: "right",
+																				minWidth: 0,
+																			}}>
+																			{modeConfig.slug}
+																		</span>
+																	</div>
 																</div>
 															</CommandItem>
 														))}
@@ -926,6 +1049,78 @@ const ModesView = () => {
 							</>
 						)}
 					</div>
+
+					{/* Mode Token Tally Card with Hover Section Breakdown */}
+					<StandardTooltip
+						content={
+							<div className="space-y-1.5 p-1 text-xs">
+								<div className="font-semibold text-vscode-foreground border-b border-vscode-widget-border pb-1">
+									{t("prompts:modes.tokenBreakdownTitle", {
+										mode: localRenames[visualMode] ?? getCurrentMode()?.name ?? visualMode,
+									})}
+									: ~{modeTokenBreakdown.totalTokens} tok
+								</div>
+								<div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-vscode-descriptionForeground">
+									<span>{t("prompts:roleDefinition.title")}:</span>
+									<span className="font-mono text-right text-vscode-foreground">
+										~{modeTokenBreakdown.roleTokens} tok
+									</span>
+									<span>{t("prompts:customInstructions.title")}:</span>
+									<span className="font-mono text-right text-vscode-foreground">
+										~{modeTokenBreakdown.instructionsTokens} tok
+									</span>
+									<span>{t("prompts:modes.tokenSectionRules")}:</span>
+									<span className="font-mono text-right text-vscode-foreground">
+										~{modeTokenBreakdown.rulesTokens} tok
+									</span>
+									<span>{t("prompts:tools.title")}:</span>
+									<span className="font-mono text-right text-vscode-foreground">
+										~{modeTokenBreakdown.capabilitiesTokens} tok
+									</span>
+									<span>
+										{t("prompts:modes.tokenSectionSkills", {
+											count: modeTokenBreakdown.modeSkillsCount,
+										})}
+										:
+									</span>
+									<span className="font-mono text-right text-vscode-foreground">
+										~{modeTokenBreakdown.skillsTokens} tok
+									</span>
+									{modeTokenBreakdown.globalInstructionsTokens > 0 && (
+										<>
+											<span>{t("prompts:modes.tokenSectionGlobal")}:</span>
+											<span className="font-mono text-right text-vscode-foreground">
+												~{modeTokenBreakdown.globalInstructionsTokens} tok
+											</span>
+										</>
+									)}
+								</div>
+							</div>
+						}>
+						<div
+							className="flex items-center justify-between p-2 px-3 rounded-lg bg-vscode-textBlockQuote-background/40 border border-vscode-widget-border text-xs mb-3 cursor-help"
+							data-testid="mode-token-tally-card">
+							<div className="flex items-center gap-2">
+								<Coins className="size-4 text-vscode-textLink-foreground shrink-0" />
+								<div>
+									<span className="font-medium text-vscode-foreground">
+										{t("prompts:modes.totalTokenTally", { count: modeTokenBreakdown.totalTokens })}
+									</span>
+									<span className="text-vscode-descriptionForeground ml-1.5">
+										(
+										{t("prompts:modes.tokenSummary", {
+											role: modeTokenBreakdown.roleTokens,
+											instructions: modeTokenBreakdown.instructionsTokens,
+										})}
+										)
+									</span>
+								</div>
+							</div>
+							<span className="text-[11px] text-vscode-descriptionForeground font-mono font-medium">
+								~{modeTokenBreakdown.totalTokens} tok / prompt
+							</span>
+						</div>
+					</StandardTooltip>
 
 					{/* API Configuration - Moved Here */}
 					<div className="mb-3">

@@ -72,6 +72,14 @@ vi.mock("@/components/ui", () => ({
 		</button>
 	),
 	StandardTooltip: ({ children }: any) => <>{children}</>,
+	Slider: ({ value, onValueChange, ...props }: any) => (
+		<input
+			type="range"
+			value={value?.[0] ?? 0}
+			onChange={(e) => onValueChange?.([Number(e.target.value)])}
+			{...props}
+		/>
+	),
 	Dialog: ({ children, open, _onOpenChange }: any) => (
 		<div data-testid="mode-dialog" data-open={open}>
 			{open && children}
@@ -431,5 +439,30 @@ describe("SkillsSettings", () => {
 		const buttons = screen.getAllByTestId("button")
 		const addButtons = buttons.filter((btn) => btn.textContent?.includes("settings:skills.addSkill"))
 		expect(addButtons.length).toBe(1)
+	})
+	it("renders failed skill with error message and failedToLoad badge", () => {
+		const brokenSkill: SkillMetadata = {
+			name: "broken-skill",
+			description: "",
+			path: "/path/broken",
+			source: "global",
+			error: "Missing required 'description' field in SKILL.md",
+		}
+
+		renderSkillsSettings([brokenSkill])
+
+		expect(screen.getByText("broken-skill")).toBeInTheDocument()
+		expect(screen.getByText("settings:skills.failedToLoadBadge")).toBeInTheDocument()
+		expect(screen.getByText("Missing required 'description' field in SKILL.md")).toBeInTheDocument()
+	})
+	it("renders token indicator on skills and total token tally", () => {
+		renderSkillsSettings()
+
+		// Should render token badge for skills
+		const tokenBadges = screen.getAllByText(/~\d+ tok/)
+		expect(tokenBadges.length).toBeGreaterThan(0)
+
+		// Should render total token tally in header
+		expect(screen.getByText(/settings:skills.totalTokenTally/)).toBeInTheDocument()
 	})
 })

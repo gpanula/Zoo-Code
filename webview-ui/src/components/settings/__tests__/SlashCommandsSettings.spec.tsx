@@ -400,4 +400,20 @@ describe("SlashCommandsSettings", () => {
 
 		expect(screen.getByText("settings:slashCommands.footer")).toBeInTheDocument()
 	})
+	it("renders failed to load badge and diagnostic for broken commands", () => {
+		const commandsWithErrors: Command[] = [
+			{
+				name: "broken-cmd",
+				source: "global",
+				filePath: "/home/.roo/commands/broken-cmd.md",
+				error: "EACCES: permission denied, open '/home/.roo/commands/broken-cmd.md'",
+			},
+		]
+
+		renderSlashCommandsSettings(commandsWithErrors)
+
+		expect(screen.getByText("settings:slashCommands.failedToLoadBadge")).toBeInTheDocument()
+		expect(screen.getByText(/EACCES: permission denied/)).toBeInTheDocument()
+		expect(screen.getByText(/settings:slashCommands.commandsFailedCount/)).toBeInTheDocument()
+	})
 })

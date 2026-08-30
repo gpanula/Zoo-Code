@@ -74,6 +74,7 @@ export interface ExtensionStateContextType extends ExtensionState {
 	setAlwaysAllowSubtasks: (value: boolean) => void
 	setShowRooIgnoredFiles: (value: boolean) => void
 	setEnableSubfolderRules: (value: boolean) => void
+	setMaxSkillDescriptionLength: (value: number) => void
 	setShowAnnouncement: (value: boolean) => void
 	setAllowedCommands: (value: string[]) => void
 	setDeniedCommands: (value: string[]) => void
@@ -234,6 +235,7 @@ const createInitialExtensionState = (): ExtensionState => ({
 	telemetrySetting: "unset",
 	showRooIgnoredFiles: true, // Default to showing .rooignore'd files with lock symbol (current behavior).
 	enableSubfolderRules: false, // Default to disabled - must be enabled to load rules from subdirectories
+	maxSkillDescriptionLength: 256,
 	renderContext: "sidebar",
 	maxReadFileLine: -1, // Default max line limit for read_file tool (-1 for default)
 	maxImageFileSize: 5, // Default max image file size in MB
@@ -607,6 +609,9 @@ export const ExtensionStateContextProvider: React.FC<{
 		setTelemetrySetting: (value) => setState((prevState) => ({ ...prevState, telemetrySetting: value })),
 		setShowRooIgnoredFiles: (value) => setState((prevState) => ({ ...prevState, showRooIgnoredFiles: value })),
 		setEnableSubfolderRules: (value) => setState((prevState) => ({ ...prevState, enableSubfolderRules: value })),
+		setMaxSkillDescriptionLength: (value) =>
+			setState((prevState) => ({ ...prevState, maxSkillDescriptionLength: value })),
+		maxSkillDescriptionLength: state.maxSkillDescriptionLength ?? 256,
 		setAwsUsePromptCache: (value) => setState((prevState) => ({ ...prevState, awsUsePromptCache: value })),
 		setMaxImageFileSize: (value) => setState((prevState) => ({ ...prevState, maxImageFileSize: value })),
 		setMaxTotalImageSize: (value) => setState((prevState) => ({ ...prevState, maxTotalImageSize: value })),
