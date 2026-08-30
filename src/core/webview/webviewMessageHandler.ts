@@ -179,6 +179,7 @@ export const webviewMessageHandler = async (
 			filePath: command.filePath,
 			description: command.description,
 			argumentHint: command.argumentHint,
+			error: command.error,
 		}))
 
 		const existingCommandNames = new Set(commandList.map((command) => command.name))
@@ -202,6 +203,7 @@ export const webviewMessageHandler = async (
 				source: skill.source,
 				filePath: skill.path,
 				description: skill.description,
+				error: skill.error,
 			})
 		}
 

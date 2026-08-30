@@ -18,6 +18,78 @@ import { t } from "../../i18n"
 // Re-export for convenience
 export type { SkillMetadata, SkillContent }
 
+/**
+ * Parse frontmatter safely with fallback for loose/non-strict YAML formatting and block scalars (> or |).
+ */
+export function parseSkillFrontmatter(fileContent: string): { data: Record<string, unknown>; content: string } {
+	try {
+		return matter(fileContent)
+	} catch {
+		const match = fileContent.match(/^---\r?\n([\s\S]*?)\r?\n---([\s\S]*)$/)
+		if (!match) {
+			return { data: {}, content: fileContent }
+		}
+		const yamlBlock = match[1]
+		const body = match[2]
+		const data: Record<string, unknown> = {}
+
+		const extractField = (fieldName: string): string | undefined => {
+			// 1. Block scalar: field:\s*[>|][+-]?\n((?:[ \t]+[^\n]*\n?)+)
+			const blockMatch = yamlBlock.match(
+				new RegExp(`^${fieldName}:\\s*[>|][+-]?\\r?\\n((?:[ \\t]+[^\\r\\n]*\\r?\\n?)+)`, "m"),
+			)
+			if (blockMatch) {
+				return blockMatch[1]
+					.split(/\r?\n/)
+					.map((line) => line.trim())
+					.filter(Boolean)
+					.join(" ")
+			}
+
+			// 2. Quoted string
+			const quotedMatch = yamlBlock.match(new RegExp(`^${fieldName}:\\s*["']([\\s\\S]*?)["']`, "m"))
+			if (quotedMatch) {
+				return quotedMatch[1].replace(/\r?\n/g, " ").trim()
+			}
+
+			// 3. Simple line or multiline indented
+			const multiMatch = yamlBlock.match(
+				new RegExp(`^${fieldName}:[ \\t]*([^\\r\\n]*)(?:\\r?\\n((?:[ \\t]+[^\\r\\n]*\\r?\\n?)+))?`, "m"),
+			)
+			if (multiMatch) {
+				const firstLine = (multiMatch[1] || "").trim()
+				const nextLines = multiMatch[2]
+					? multiMatch[2]
+							.split(/\r?\n/)
+							.map((line) => line.trim())
+							.filter(Boolean)
+							.join(" ")
+					: ""
+				if (firstLine === ">" || firstLine === "|") {
+					return nextLines
+				}
+				return [firstLine, nextLines].filter(Boolean).join(" ")
+			}
+
+			return undefined
+		}
+
+		const nameMatch = yamlBlock.match(/^name:\s*["']?([^"'\r\n]+)["']?/m)
+		if (nameMatch) data.name = nameMatch[1].trim()
+
+		const desc = extractField("description")
+		if (desc) data.description = desc
+
+		const sum = extractField("summary")
+		if (sum) data.summary = sum
+
+		const trig = extractField("trigger")
+		if (trig) data.trigger = trig
+
+		return { data, content: body }
+	}
+}
+
 export class SkillsManager {
 	private skills: Map<string, SkillMetadata> = new Map()
 	private providerRef: WeakRef<ClineProvider>
@@ -98,27 +170,56 @@ export class SkillsManager {
 		const skillMdPath = path.join(skillDir, "SKILL.md")
 		if (!(await fileExists(skillMdPath))) return
 
+		const effectiveSkillName = skillName || path.basename(skillDir)
+		const fallbackKey = this.getSkillKey(effectiveSkillName, source, mode)
+
 		try {
 			const fileContent = await fs.readFile(skillMdPath, "utf-8")
 
-			// Use gray-matter to parse frontmatter
-			const { data: frontmatter, content: body } = matter(fileContent)
+			// Use gray-matter with fallback to parse frontmatter
+			const { data: frontmatter, content: body } = parseSkillFrontmatter(fileContent)
 
 			// Validate required fields (only name and description for now)
 			if (!frontmatter.name || typeof frontmatter.name !== "string") {
-				console.error(`Skill at ${skillDir} is missing required 'name' field`)
+				const errMsg = "Missing required 'name' field in SKILL.md frontmatter"
+				console.error(`Skill at ${skillDir}: ${errMsg}`)
+				this.skills.set(fallbackKey, {
+					name: effectiveSkillName,
+					description: "",
+					path: skillMdPath,
+					source,
+					mode,
+					error: errMsg,
+				})
 				return
 			}
 			if (!frontmatter.description || typeof frontmatter.description !== "string") {
-				console.error(`Skill at ${skillDir} is missing required 'description' field`)
+				const errMsg = "Missing required 'description' field in SKILL.md frontmatter"
+				console.error(`Skill at ${skillDir}: ${errMsg}`)
+				this.skills.set(fallbackKey, {
+					name: effectiveSkillName,
+					description: "",
+					path: skillMdPath,
+					source,
+					mode,
+					error: errMsg,
+				})
 				return
 			}
 
 			// Validate that frontmatter name matches the skill name (directory name or symlink name)
 			// Per the Agent Skills spec: "name field must match the parent directory name"
-			const effectiveSkillName = skillName || path.basename(skillDir)
 			if (frontmatter.name !== effectiveSkillName) {
-				console.error(`Skill name "${frontmatter.name}" doesn't match directory "${effectiveSkillName}"`)
+				const errMsg = `Skill name "${frontmatter.name}" in frontmatter does not match parent directory "${effectiveSkillName}"`
+				console.error(errMsg)
+				this.skills.set(fallbackKey, {
+					name: effectiveSkillName,
+					description: frontmatter.description || "",
+					path: skillMdPath,
+					source,
+					mode,
+					error: errMsg,
+				})
 				return
 			}
 
@@ -127,6 +228,14 @@ export class SkillsManager {
 			if (!nameValidation.valid) {
 				const errorMessage = this.getSkillNameErrorMessage(effectiveSkillName, nameValidation.error!)
 				console.error(`Skill name "${effectiveSkillName}" is invalid: ${errorMessage}`)
+				this.skills.set(fallbackKey, {
+					name: effectiveSkillName,
+					description: frontmatter.description || "",
+					path: skillMdPath,
+					source,
+					mode,
+					error: errorMessage,
+				})
 				return
 			}
 
@@ -135,9 +244,16 @@ export class SkillsManager {
 			// - non-empty (after trimming)
 			const description = frontmatter.description.trim()
 			if (description.length < 1 || description.length > 1024) {
-				console.error(
-					`Skill "${effectiveSkillName}" has an invalid description length: must be 1-1024 characters (got ${description.length})`,
-				)
+				const errMsg = `Invalid description length: must be 1-1024 characters (got ${description.length})`
+				console.error(`Skill "${effectiveSkillName}": ${errMsg}`)
+				this.skills.set(fallbackKey, {
+					name: effectiveSkillName,
+					description,
+					path: skillMdPath,
+					source,
+					mode,
+					error: errMsg,
+				})
 				return
 			}
 
@@ -157,6 +273,16 @@ export class SkillsManager {
 				modeSlugs = [mode]
 			}
 
+			// Parse optional compact summary (priority: summary > caveman_summary > compact)
+			const summary =
+				typeof frontmatter.summary === "string" && frontmatter.summary.trim().length > 0
+					? frontmatter.summary.trim()
+					: typeof frontmatter.caveman_summary === "string" && frontmatter.caveman_summary.trim().length > 0
+						? frontmatter.caveman_summary.trim()
+						: typeof frontmatter.compact === "string" && frontmatter.compact.trim().length > 0
+							? frontmatter.compact.trim()
+							: undefined
+
 			// Create unique key combining name, source, and modeSlugs for override resolution
 			// For backward compatibility, use first mode slug or undefined for the key
 			const primaryMode = modeSlugs?.[0]
@@ -165,13 +291,23 @@ export class SkillsManager {
 			this.skills.set(skillKey, {
 				name: effectiveSkillName,
 				description,
+				summary,
 				path: skillMdPath,
 				source,
 				mode: primaryMode, // Deprecated: kept for backward compatibility
 				modeSlugs, // New: array of mode slugs, undefined = any mode
 			})
 		} catch (error) {
+			const errMsg = error instanceof Error ? error.message : String(error)
 			console.error(`Failed to load skill at ${skillDir}:`, error)
+			this.skills.set(fallbackKey, {
+				name: effectiveSkillName,
+				description: "",
+				path: skillMdPath,
+				source,
+				mode,
+				error: `Failed to load skill: ${errMsg}`,
+			})
 		}
 	}
 
@@ -185,6 +321,9 @@ export class SkillsManager {
 		const resolvedSkills = new Map<string, SkillMetadata>()
 
 		for (const skill of this.skills.values()) {
+			// Skip skills that failed to load or validate
+			if (skill.error) continue
+
 			// Check if skill is available in current mode:
 			// - modeSlugs undefined or empty = available in all modes ("Any mode")
 			// - modeSlugs array with values = available only if currentMode is in the array
@@ -254,7 +393,17 @@ export class SkillsManager {
 	/**
 	 * Get all skills (for UI display, debugging, etc.)
 	 */
+	/**
+	 * Get all valid skills without errors.
+	 */
 	getAllSkills(): SkillMetadata[] {
+		return Array.from(this.skills.values()).filter((s) => !s.error)
+	}
+
+	/**
+	 * Get all skills metadata (including failed/error skills) for UI display.
+	 */
+	getSkillsMetadata(): SkillMetadata[] {
 		return Array.from(this.skills.values())
 	}
 
@@ -270,11 +419,11 @@ export class SkillsManager {
 			skill = Array.from(this.skills.values()).find((s) => s.name === name)
 		}
 
-		if (!skill) return null
+		if (!skill || skill.error) return null
 
 		// Read skill content from disk
 		const fileContent = await fs.readFile(skill.path, "utf-8")
-		const { content: body } = matter(fileContent)
+		const { content: body } = parseSkillFrontmatter(fileContent)
 
 		return {
 			...skill,
@@ -286,9 +435,6 @@ export class SkillsManager {
 	 * Get all skills metadata (for UI display)
 	 * Returns skills from all sources without content
 	 */
-	getSkillsMetadata(): SkillMetadata[] {
-		return this.getAllSkills()
-	}
 
 	/**
 	 * Get a skill by name, source, and optionally mode
@@ -540,7 +686,7 @@ Add your skill instructions here.
 
 		// Read the current SKILL.md file
 		const fileContent = await fs.readFile(skill.path, "utf-8")
-		const { data: frontmatter, content: body } = matter(fileContent)
+		const { data: frontmatter, content: body } = parseSkillFrontmatter(fileContent)
 
 		// Update the frontmatter with new modeSlugs
 		if (newModeSlugs && newModeSlugs.length > 0) {

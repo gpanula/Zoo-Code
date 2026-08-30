@@ -18,6 +18,7 @@ export interface Command {
 	description?: string
 	argumentHint?: string
 	mode?: string
+	error?: string
 }
 
 /**
@@ -297,6 +298,9 @@ async function scanCommandDirectory(
 
 			try {
 				const content = await fs.readFile(resolvedPath, "utf-8")
+				if (typeof content !== "string") {
+					continue
+				}
 
 				let parsed
 				let description: string | undefined
@@ -308,24 +312,24 @@ async function scanCommandDirectory(
 					// Try to parse frontmatter with gray-matter
 					parsed = matter(content)
 					description =
-						typeof parsed.data.description === "string" && parsed.data.description.trim()
+						typeof parsed.data?.description === "string" && parsed.data.description.trim()
 							? parsed.data.description.trim()
 							: undefined
 					argumentHint =
-						typeof parsed.data["argument-hint"] === "string" && parsed.data["argument-hint"].trim()
+						typeof parsed.data?.["argument-hint"] === "string" && parsed.data["argument-hint"].trim()
 							? parsed.data["argument-hint"].trim()
 							: undefined
 					mode =
-						typeof parsed.data.mode === "string" && parsed.data.mode.trim()
+						typeof parsed.data?.mode === "string" && parsed.data.mode.trim()
 							? parsed.data.mode.trim()
 							: undefined
-					commandContent = parsed.content.trim()
+					commandContent = parsed.content?.trim() || ""
 				} catch {
 					// If frontmatter parsing fails, treat the entire content as command content
 					description = undefined
 					argumentHint = undefined
 					mode = undefined
-					commandContent = content.trim()
+					commandContent = (content || "").trim()
 				}
 
 				// Project commands override global ones
@@ -342,6 +346,17 @@ async function scanCommandDirectory(
 				}
 			} catch (error) {
 				console.warn(`Failed to read command file ${resolvedPath}:`, error)
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				if (!commands.has(commandName)) {
+					commands.set(commandName, {
+						name: commandName,
+						content: "",
+						source,
+						filePath: resolvedPath,
+						description: undefined,
+						error: errorMessage,
+					})
+				}
 			}
 		}
 	} catch {

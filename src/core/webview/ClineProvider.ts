@@ -304,7 +304,7 @@ export class ClineProvider
 
 	public isViewLaunched = false
 	public settingsImportedAt?: number
-	public readonly latestAnnouncementId = "aug-2026-v3.80.1-gateway-promo-models-fixes" // v3.80.1 Zoo Gateway promo, GLM-5.3-Flash, and reliability fixes
+	public readonly latestAnnouncementId = "aug-2026-v3.80.1-caveman-edition" // v3.80.1 Zoo Gateway promo, GLM-5.3-Flash, and reliability fixes
 	public readonly providerSettingsManager: ProviderSettingsManager
 	public readonly customModesManager: CustomModesManager
 
@@ -2620,6 +2620,7 @@ export class ClineProvider
 			telemetrySetting,
 			showRooIgnoredFiles,
 			enableSubfolderRules,
+			maxSkillDescriptionLength,
 			language,
 			maxImageFileSize,
 			maxTotalImageSize,
@@ -2788,6 +2789,7 @@ export class ClineProvider
 			vscodeTelemetryEnabled,
 			showRooIgnoredFiles: showRooIgnoredFiles ?? false,
 			enableSubfolderRules: enableSubfolderRules ?? false,
+			maxSkillDescriptionLength: maxSkillDescriptionLength ?? 256,
 			language: language ?? formatLanguage(vscode.env.language),
 			renderContext: this.renderContext,
 			maxImageFileSize: maxImageFileSize ?? 5,
@@ -3019,6 +3021,7 @@ export class ClineProvider
 			telemetrySetting: stateValues.telemetrySetting || "unset",
 			showRooIgnoredFiles: stateValues.showRooIgnoredFiles ?? false,
 			enableSubfolderRules: stateValues.enableSubfolderRules ?? false,
+			maxSkillDescriptionLength: stateValues.maxSkillDescriptionLength ?? 256,
 			maxImageFileSize: stateValues.maxImageFileSize ?? 5,
 			maxTotalImageSize: stateValues.maxTotalImageSize ?? 20,
 			historyPreviewCollapsed: stateValues.historyPreviewCollapsed ?? false,

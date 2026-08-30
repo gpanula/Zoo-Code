@@ -109,7 +109,7 @@ vi.mock("../../../i18n", () => ({
 	},
 }))
 
-import { SkillsManager } from "../SkillsManager"
+import { SkillsManager, parseSkillFrontmatter } from "../SkillsManager"
 import { ClineProvider } from "../../../core/webview/ClineProvider"
 
 describe("SkillsManager", () => {
@@ -479,6 +479,49 @@ description: "   "
 			await skillsManager.discoverSkills()
 			const skills = skillsManager.getAllSkills()
 			expect(skills).toHaveLength(0)
+		})
+
+		it("should record error on skills with invalid description in getSkillsMetadata", async () => {
+			const validNameDir = p(globalSkillsDir, "valid-name")
+			const validNameMd = p(validNameDir, "SKILL.md")
+
+			mockDirectoryExists.mockImplementation(async (dir: string) => {
+				return dir === globalSkillsDir
+			})
+			mockRealpath.mockImplementation(async (pathArg: string) => pathArg)
+			mockReaddir.mockImplementation(async (dir: string) => {
+				if (dir === globalSkillsDir) {
+					return ["valid-name"]
+				}
+				return []
+			})
+			mockStat.mockImplementation(async (pathArg: string) => {
+				if (pathArg === validNameDir) {
+					return { isDirectory: () => true }
+				}
+				throw new Error("Not found")
+			})
+			mockFileExists.mockImplementation(async (file: string) => {
+				return file === validNameMd
+			})
+			mockReadFile.mockImplementation(async (file: string) => {
+				if (file === validNameMd) {
+					return `---
+name: valid-name
+description: ""
+---
+# Invalid`
+				}
+				throw new Error("File not found")
+			})
+
+			await skillsManager.discoverSkills()
+
+			expect(skillsManager.getAllSkills()).toHaveLength(0)
+			const metadata = skillsManager.getSkillsMetadata()
+			expect(metadata).toHaveLength(1)
+			expect(metadata[0].name).toBe("valid-name")
+			expect(metadata[0].error).toBeDefined()
 		})
 
 		it("should skip skills with too-long descriptions (spec compliance)", async () => {
@@ -1755,5 +1798,24 @@ Instructions`)
 			// Verify directory was NOT cleaned up (still has other skills)
 			expect(mockRmdir).not.toHaveBeenCalled()
 		})
+	})
+	it("correctly parses folded block scalar (>) descriptions with unquoted triggers", () => {
+		const yamlWithFolded = `---
+name: caveman-compress
+description: >
+  Compress natural language memory files (CLAUDE.md, todos, preferences) into caveman format
+  to save input tokens. Preserves all technical substance, code, URLs, and structure.
+  Compressed version overwrites the original file. Human-readable backup saved as FILE.original.md.
+  Trigger: /caveman-compress FILEPATH or "compress memory file"
+summary: Compress memory files (CLAUDE.md, todos) to caveman format to save tokens. Keeps code, URLs, and structure; backs up to FILE.original.md. Trigger: /caveman-compress FILEPATH or "compress memory file"
+---
+
+# Caveman Compress
+`
+		const { data } = parseSkillFrontmatter(yamlWithFolded)
+		expect(data.name).toBe("caveman-compress")
+		expect(data.description).toContain("Compress natural language memory files")
+		expect(data.description).not.toBe(">")
+		expect(data.summary).toContain("Compress memory files")
 	})
 })

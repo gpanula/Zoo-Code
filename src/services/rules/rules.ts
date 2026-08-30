@@ -187,25 +187,41 @@ async function scanRuleDirectory(directory: RuleDirectoryInfo): Promise<RuleMeta
 			),
 		)
 
-		return fileInfo
-			.filter(({ originalPath }) => shouldIncludeRuleFile(originalPath))
-			.sort((a, b) => a.originalPath.toLowerCase().localeCompare(b.originalPath.toLowerCase()))
-			.map(({ originalPath, resolvedPath, isSymlink }) => {
-				const relativePath = path.relative(directory.directoryPath, originalPath)
-				const name = path.basename(originalPath)
-				return {
-					id: createRuleId(directory.scope, directory.kind, directory.modeSlug, relativePath),
-					name,
-					scope: directory.scope,
-					kind: directory.kind,
-					modeSlug: directory.modeSlug,
-					modeName: directory.modeName,
-					filePath: resolvedPath,
-					relativePath,
-					directoryPath: directory.directoryPath,
-					isSymlink,
-				}
-			})
+		return Promise.all(
+			fileInfo
+				.filter(({ originalPath }) => shouldIncludeRuleFile(originalPath))
+				.sort((a, b) => a.originalPath.toLowerCase().localeCompare(b.originalPath.toLowerCase()))
+				.map(async ({ originalPath, resolvedPath, isSymlink }) => {
+					const relativePath = path.relative(directory.directoryPath, originalPath)
+					const name = path.basename(originalPath)
+					let content: string | undefined
+					let charCount = 0
+					let error: string | undefined
+
+					try {
+						content = await fs.readFile(resolvedPath, "utf-8")
+						charCount = content.length
+					} catch (err) {
+						error = err instanceof Error ? err.message : String(err)
+					}
+
+					return {
+						id: createRuleId(directory.scope, directory.kind, directory.modeSlug, relativePath),
+						name,
+						scope: directory.scope,
+						kind: directory.kind,
+						modeSlug: directory.modeSlug,
+						modeName: directory.modeName,
+						filePath: resolvedPath,
+						relativePath,
+						directoryPath: directory.directoryPath,
+						isSymlink,
+						content,
+						charCount,
+						error,
+					}
+				}),
+		)
 	} catch (error) {
 		if (["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) {
 			return []

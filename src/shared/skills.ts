@@ -5,6 +5,7 @@
 export interface SkillMetadata {
 	name: string // Required: skill identifier
 	description: string // Required: when to use this skill
+	summary?: string // Optional: compact summary for prompt inclusion
 	path: string // Absolute path to SKILL.md
 	source: "global" | "project" // Where the skill was discovered
 	/**
@@ -18,6 +19,7 @@ export interface SkillMetadata {
 	 * - An array with one or more mode slugs restricts the skill to those modes.
 	 */
 	modeSlugs?: string[]
+	error?: string
 }
 
 /**

@@ -4078,6 +4078,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						.getConfiguration(Package.name)
 						.get<boolean>("newTaskRequireTodos", false),
 					isStealthModel: modelInfo?.isStealthModel,
+					maxSkillDescriptionLength: state?.maxSkillDescriptionLength ?? 256,
 				},
 				undefined, // todoList
 				this.api.getModel().id,
