@@ -3,5 +3,5 @@ export function markdownFormattingSection(): string {
 
 MARKDOWN RULES
 
-ALL responses MUST show ANY \`language construct\` OR filename reference as clickable, exactly as [\`filename OR language.declaration()\`](relative/file/path.ext:line); line is required for \`syntax\` and optional for filename links. This applies to ALL markdown responses and ALSO those in attempt_completion`
+Format code constructs and filenames as clickable links: [\`name\`](path/to/file:line). Line number required for code symbols, optional for files. Applies to all markdown outputs including \`attempt_completion\`.`
 }

@@ -16,7 +16,7 @@ export async function getModesSection(context: vscode.ExtensionContext): Promise
 
 MODES
 
-- These are the currently available modes:
+- Available modes:
 ${allModes
 	.map((mode: ModeConfig) => {
 		let description: string

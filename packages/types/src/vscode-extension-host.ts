@@ -352,6 +352,7 @@ export type ExtensionState = Pick<
 	maxWorkspaceFiles: number // Maximum number of files to include in current working directory details (0-500)
 	showRooIgnoredFiles: boolean // Whether to show .rooignore'd files in listings
 	enableSubfolderRules: boolean // Whether to load rules from subdirectories
+	maxSkillDescriptionLength?: number // Maximum character length for skill descriptions in prompts
 	maxReadFileLine?: number // Maximum line limit for read_file tool (-1 for default)
 	maxImageFileSize: number // Maximum size of image files to process in MB
 	maxTotalImageSize: number // Maximum total size for all images in a single read operation in MB
@@ -440,6 +441,7 @@ export interface Command {
 	filePath?: string
 	description?: string
 	argumentHint?: string
+	error?: string
 }
 
 /**

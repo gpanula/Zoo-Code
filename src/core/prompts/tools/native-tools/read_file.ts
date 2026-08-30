@@ -62,24 +62,11 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): OpenAI.Ch
 
 	// Build description based on capabilities
 	const descriptionIntro =
-		"Read a file and return its contents with line numbers for diffing or discussion. IMPORTANT: This tool reads exactly one file per call. If you need multiple files, issue multiple parallel read_file calls."
-
+		"Read file contents with line numbers. Reads exactly one file per call (use multiple parallel read_file calls for multiple files)."
 	const modeDescription =
-		` Supports two modes: 'slice' (default) reads lines sequentially with offset/limit; 'indentation' extracts complete semantic code blocks around an anchor line based on indentation hierarchy.` +
-		` Slice mode is ideal for initial file exploration, understanding overall structure, reading configuration/data files, or when you need a specific line range. Use it when you don't have a target line number.` +
-		` PREFER indentation mode when you have a specific line number from search results, error messages, or definition lookups - it guarantees complete, syntactically valid code blocks without mid-function truncation.` +
-		` IMPORTANT: Indentation mode requires anchor_line to be useful. Without it, only header content (imports) is returned.`
-
-	const limitNote = ` By default, returns up to ${DEFAULT_LINE_LIMIT} lines per file. Lines longer than ${MAX_LINE_LENGTH} characters are truncated.`
-
-	const description =
-		descriptionIntro +
-		modeDescription +
-		limitNote +
-		" " +
-		getReadFileSupportsNote(supportsImages) +
-		` Example: { path: 'src/app.ts' }` +
-		` Example (indentation mode): { path: 'src/app.ts', mode: 'indentation', indentation: { anchor_line: 42 } }`
+		" Modes: 'slice' (offset/limit reading) or 'indentation' (extract semantic code block around anchor_line)."
+	const limitNote = ` Max ${DEFAULT_LINE_LIMIT} lines. Lines > ${MAX_LINE_LENGTH} chars truncated.`
+	const description = descriptionIntro + modeDescription + limitNote + " " + getReadFileSupportsNote(supportsImages)
 
 	const indentationProperties: Record<string, unknown> = {
 		anchor_line: {

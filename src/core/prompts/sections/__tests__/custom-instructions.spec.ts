@@ -976,7 +976,7 @@ describe("addCustomInstructions", () => {
 		)
 
 		expect(result).toContain("Language Preference:")
-		expect(result).toContain('"xyz" (xyz) language') // For unknown codes, the code is used as the name too
+		expect(result).toContain('"xyz" (xyz)') // For unknown codes, the code is used as the name too
 		expect(result).toContain("Global Instructions:\nglobal instructions")
 	})
 

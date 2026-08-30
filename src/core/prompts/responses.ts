@@ -216,11 +216,7 @@ const formatImagesIntoBlocks = (images?: string[]): Anthropic.ImageBlockParam[] 
 		: []
 }
 
-const toolUseInstructionsReminderNative = `# Reminder: Instructions for Tool Use
-
-Tools are invoked using the platform's native tool calling mechanism. Each tool requires specific parameters as defined in the tool descriptions. Refer to the tool definitions provided in your system instructions for the correct parameter structure and usage examples.
-
-Always ensure you provide all required parameters for the tool you wish to use.`
+const toolUseInstructionsReminderNative = `Invoke tools via native tool calling. Provide all required parameters as defined in schemas.`
 
 /**
  * Gets the tool use instructions reminder.

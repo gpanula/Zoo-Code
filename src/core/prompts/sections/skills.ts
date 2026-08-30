@@ -7,8 +7,59 @@ function escapeXml(value: string): string {
 		.replace(/&/g, "&amp;")
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;")
-		.replace(/\"/g, "&quot;")
+		.replace(/"/g, "&quot;")
 		.replace(/'/g, "&apos;")
+}
+
+function packSentences(text: string, maxChars: number): string {
+	// Hardened sentence split: only splits on [.!?] when followed by whitespace AND an uppercase letter
+	const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z])/)
+	let result = ""
+	for (const sentence of sentences) {
+		const candidate = result ? `${result} ${sentence}` : sentence
+		if (candidate.length <= maxChars) {
+			result = candidate
+		} else {
+			break
+		}
+	}
+
+	if (result.length > 0) {
+		return result
+	}
+
+	// Fallback only if the first sentence alone exceeds maxChars
+	return `${text.slice(0, maxChars - 3).trimEnd()}...`
+}
+
+/**
+ * Resolves a concise summary for a skill, respecting a configurable max character limit:
+ * 1. Checks author-provided summary/caveman_summary/compact (bounded by maxChars)
+ * 2. Falls back to hardened sentence-packing from description
+ * 3. Enforces maxChars bound across all paths
+ *
+ * @param skill - Skill metadata object containing description and optional summary
+ * @param maxChars - Maximum character length (default: 256)
+ */
+export function resolveSkillSummary(skill: { summary?: string; description: string }, maxChars: number = 256): string {
+	// 1. Author-provided compact summary (strictly bounded by maxChars)
+	if (skill.summary?.trim()) {
+		const sum = skill.summary.replace(/\s+/g, " ").trim()
+		if (sum.length <= maxChars) {
+			return sum
+		}
+		return packSentences(sum, maxChars)
+	}
+
+	if (!skill.description) return ""
+
+	const normalized = skill.description.replace(/\s+/g, " ").trim()
+	if (normalized.length <= maxChars) {
+		return normalized
+	}
+
+	// 2. Fallback: hardened sentence-packing from description
+	return packSentences(normalized, maxChars)
 }
 
 /**
@@ -18,10 +69,12 @@ function escapeXml(value: string): string {
  *
  * @param skillsManager - The SkillsManager instance
  * @param currentMode - The current mode slug (e.g., 'code', 'architect')
+ * @param maxDescriptionLength - Maximum character length for skill descriptions (default: 256)
  */
 export async function getSkillsSection(
 	skillsManager: SkillsManagerLike | undefined,
 	currentMode: string | undefined,
+	maxDescriptionLength: number = 256,
 ): Promise<string> {
 	if (!skillsManager || !currentMode) return ""
 
@@ -32,7 +85,7 @@ export async function getSkillsSection(
 	const skillsXml = skills
 		.map((skill) => {
 			const name = escapeXml(skill.name)
-			const description = escapeXml(skill.description)
+			const description = escapeXml(resolveSkillSummary(skill, maxDescriptionLength))
 			const locationLine = `\n    <location>${escapeXml(skill.path)}</location>`
 			return `  <skill>\n    <name>${name}</name>\n    <description>${description}</description>${locationLine}\n  </skill>`
 		})
@@ -47,59 +100,9 @@ ${skillsXml}
 </available_skills>
 
 <mandatory_skill_check>
-REQUIRED PRECONDITION
-
-Before producing ANY user-facing response, you MUST perform a skill applicability check.
-
-Step 1: Skill Evaluation
-- Evaluate the user's request against ALL available skill <description> entries in <available_skills>.
-- Determine whether at least one skill clearly and unambiguously applies.
-
-Step 2: Branching Decision
-
-<if_skill_applies>
-- Select EXACTLY ONE skill.
-- Prefer the most specific skill when multiple skills match.
-- Use the skill tool to load the skill by name.
-- Load the skill's instructions fully into context BEFORE continuing.
-- Follow the skill instructions precisely.
-- Do NOT respond outside the skill-defined flow.
-</if_skill_applies>
-
-<if_no_skill_applies>
-- Proceed with a normal response.
-- Do NOT load any SKILL.md files.
-</if_no_skill_applies>
-
-CONSTRAINTS:
-- Do NOT load every skill up front.
-- Load skills ONLY after a skill is selected.
-- Do NOT reload a skill whose instructions already appear in this conversation.
-- Do NOT skip this check.
-- FAILURE to perform this check is an error.
-</mandatory_skill_check>
-
-<linked_file_handling>
-- When a skill is loaded, ONLY the skill instructions are present.
-- Files linked from the skill are NOT loaded automatically.
-- The model MUST explicitly decide to read a linked file based on task relevance.
-- Do NOT assume the contents of linked files unless they have been explicitly read.
-- Prefer reading the minimum necessary linked file.
-- Avoid reading multiple linked files unless required.
-- Treat linked files as progressive disclosure, not mandatory context.
-</linked_file_handling>
-
-<context_notes>
-- The skill list is already filtered for the current mode: "${currentMode}".
-- Mode-specific skills may come from skills-${currentMode}/ with project-level overrides taking precedence over global skills.
-</context_notes>
-
-<internal_verification>
-This section is for internal control only.
-Do NOT include this section in user-facing output.
-
-After completing the evaluation, internally confirm:
-<skill_check_completed>true|false</skill_check_completed>
-</internal_verification>
-`
+REQUIRED PRECONDITION: Evaluate user request against <available_skills>.
+If match found: select one, invoke \`skill\` tool to load (skip if already loaded in context), follow instructions.
+If no match: proceed normally.
+Linked files: read only on-demand.
+</mandatory_skill_check>`
 }

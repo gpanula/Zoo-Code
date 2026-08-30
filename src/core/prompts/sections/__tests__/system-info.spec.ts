@@ -33,10 +33,9 @@ describe("getSystemInfoSection", () => {
 
 		const result = getSystemInfoSection(mockCwd)
 
-		expect(result).toContain("Operating System: Ubuntu 22.04")
-		expect(result).toContain("Default Shell: /bin/bash")
-		expect(result).toContain(`Home Directory: ${mockHomeDir}`)
-		expect(result).toContain(`Current Workspace Directory: ${mockCwd}`)
+		expect(result).toContain("OS: Ubuntu 22.04 | Shell: /bin/bash | Workspace: /test/workspace")
+		expect(result).not.toContain("Home Directory")
+		expect(result).not.toContain(mockHomeDir)
 	})
 
 	it("should fallback to platform and release when os-name throws error", () => {
@@ -46,10 +45,9 @@ describe("getSystemInfoSection", () => {
 
 		const result = getSystemInfoSection(mockCwd)
 
-		expect(result).toContain("Operating System: linux 5.15.0")
-		expect(result).toContain("Default Shell: /bin/bash")
-		expect(result).toContain(`Home Directory: ${mockHomeDir}`)
-		expect(result).toContain(`Current Workspace Directory: ${mockCwd}`)
+		expect(result).toContain("OS: linux 5.15.0 | Shell: /bin/bash | Workspace: /test/workspace")
+		expect(result).not.toContain("Home Directory")
+		expect(result).not.toContain(mockHomeDir)
 	})
 
 	it("should handle Windows platform in fallback", () => {
@@ -61,6 +59,6 @@ describe("getSystemInfoSection", () => {
 
 		const result = getSystemInfoSection(mockCwd)
 
-		expect(result).toContain("Operating System: win32 10.0.19043")
+		expect(result).toContain("OS: win32 10.0.19043")
 	})
 })

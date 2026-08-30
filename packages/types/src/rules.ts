@@ -14,6 +14,9 @@ export interface RuleMetadata {
 	directoryPath: string
 	description?: string
 	isSymlink?: boolean
+	content?: string
+	charCount?: number
+	error?: string
 }
 
 export interface CreateRuleInput {

@@ -15,7 +15,7 @@ describe("addCustomInstructions", () => {
 		)
 
 		expect(result).toContain("Language Preference:")
-		expect(result).toContain('You should always speak and think in the "Français" (fr) language')
+		expect(result).toContain('Think and speak in "Français" (fr)')
 	})
 
 	it("works without vscode language", async () => {
@@ -27,7 +27,7 @@ describe("addCustomInstructions", () => {
 		)
 
 		expect(result).not.toContain("Language Preference:")
-		expect(result).not.toContain("You should always speak and think in")
+		expect(result).not.toContain("Think and speak in")
 	})
 })
 
@@ -39,8 +39,8 @@ describe("getCapabilitiesSection", () => {
 
 		expect(result).toContain("CAPABILITIES")
 		expect(result).toContain("execute CLI commands")
-		expect(result).toContain("list files")
-		expect(result).toContain("read and write files")
+		expect(result).toContain("list/search files")
+		expect(result).toContain("read/write/edit code")
 	})
 
 	const createMockMcpHub = (serverNames: string[]): McpHub =>
@@ -97,7 +97,7 @@ describe("getRulesSection", () => {
 		const result = getRulesSection(cwd)
 
 		expect(result).toContain("RULES")
-		expect(result).toContain("project base directory")
+		expect(result).toContain("Project base directory")
 		expect(result).toContain(cwd)
 	})
 

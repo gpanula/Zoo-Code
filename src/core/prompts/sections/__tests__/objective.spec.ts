@@ -5,43 +5,31 @@ describe("getObjectiveSection", () => {
 		const objective = getObjectiveSection()
 
 		// Check that all numbered items are present
-		expect(objective).toContain("1. Analyze the user's task")
-		expect(objective).toContain("2. Work through these goals sequentially")
-		expect(objective).toContain("3. Remember, you have extensive capabilities")
-		expect(objective).toContain("4. Once you've completed the user's task")
-		expect(objective).toContain("5. The user may provide feedback")
-	})
-
-	it("should include analysis guidance", () => {
-		const objective = getObjectiveSection()
-
-		expect(objective).toContain("Before calling a tool, do some analysis")
-		expect(objective).toContain("analyze the file structure provided in environment_details")
-		expect(objective).toContain("think about which of the provided tools is the most relevant")
+		expect(objective).toContain("1. Analyze task")
+		expect(objective).toContain("2. Work sequentially")
+		expect(objective).toContain("3. Tool parameter rule")
+		expect(objective).toContain("4. Present finished work via `attempt_completion`")
+		expect(objective).toContain("5. Iterate on user feedback")
 	})
 
 	it("should include parameter inference guidance", () => {
 		const objective = getObjectiveSection()
 
-		expect(objective).toContain("Go through each of the required parameters")
-		expect(objective).toContain(
-			"determine if the user has directly provided or given enough information to infer a value",
-		)
-		expect(objective).toContain("DO NOT invoke the tool (not even with fillers for the missing params)")
-		expect(objective).toContain("ask_followup_question tool")
+		expect(objective).toContain("Verify all required parameters")
+		expect(objective).toContain("DO NOT invoke tool (no dummy values)")
+		expect(objective).toContain("ask_followup_question")
 	})
 
-	it("should include guidance about not engaging in back and forth conversations", () => {
+	it("should include terminal completion guidance", () => {
 		const objective = getObjectiveSection()
 
-		expect(objective).toContain("DO NOT continue in pointless back and forth conversations")
-		expect(objective).toContain("don't end your responses with questions or offers for further assistance")
+		expect(objective).toContain("Final completion output must be terminal")
 	})
 
 	it("should include the OBJECTIVE header", () => {
 		const objective = getObjectiveSection()
 
 		expect(objective).toContain("OBJECTIVE")
-		expect(objective).toContain("You accomplish a given task iteratively")
+		expect(objective).toContain("Accomplish tasks iteratively and methodically")
 	})
 })

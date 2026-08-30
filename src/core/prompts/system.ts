@@ -86,7 +86,7 @@ async function generatePrompt(
 
 	const [modesSection, skillsSection] = await Promise.all([
 		getModesSection(context),
-		getSkillsSection(skillsManager, mode as string),
+		getSkillsSection(skillsManager, mode as string, settings?.maxSkillDescriptionLength ?? 256),
 	])
 
 	// Tools catalog is not included in the system prompt.
@@ -97,8 +97,6 @@ async function generatePrompt(
 ${markdownFormattingSection()}
 
 ${getSharedToolUseSection()}${toolsCatalog}
-
-	${getToolUseGuidelinesSection()}
 
 ${
 	// Forward the hub only when the mode actually exposes the MCP group, and pass the per-mode

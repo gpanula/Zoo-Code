@@ -1,16 +1,6 @@
 import type OpenAI from "openai"
 
-const ASK_FOLLOWUP_QUESTION_DESCRIPTION = `Ask the user a question to gather additional information needed to complete the task. Use when you need clarification or more details to proceed effectively.
-
-Parameters:
-- question: (required) A clear, specific question addressing the information needed
-- follow_up: (required) A list of 2-4 suggested answers. Suggestions must be complete, actionable answers without placeholders. Optionally include mode to switch modes (code/architect/etc.)
-
-Example: Asking for file path
-{ "question": "What is the path to the frontend-config.json file?", "follow_up": [{ "text": "./src/frontend-config.json", "mode": null }, { "text": "./config/frontend-config.json", "mode": null }, { "text": "./frontend-config.json", "mode": null }] }
-
-Example: Asking with mode switch
-{ "question": "Would you like me to implement this feature?", "follow_up": [{ "text": "Yes, implement it now", "mode": "code" }, { "text": "No, just plan it out", "mode": "architect" }] }`
+const ASK_FOLLOWUP_QUESTION_DESCRIPTION = `Ask clarifying question to user. Provide 2-4 suggested answers.`
 
 const QUESTION_PARAMETER_DESCRIPTION = `Clear, specific question that captures the missing information you need`
 
