@@ -46,11 +46,11 @@ Zoo Code builds on the foundation created by Roo Code and continues to expand it
 - **More dependable terminal and editing workflows** — fixes for premature terminal completion, task-state races, context management, diff editing, and provider-specific tool use.
 - **More control over your workspace** — rules management, per-mode MCP restrictions, multi-root path controls, model reasoning options, and completion change review actions.
 
-## What's New in v3.80.1
+## What's New in v3.80.1-caveman
 
-🤖 Try GLM-5.3-Flash and Gemini 3.7 Flash at 50% Discount for 2 Weeks and MiniMax M3 completely FREE for users with a balance on the new Zoo Gateway. https://zoocode.dev/models
-
-- **New model** — GLM-5.3-Flash is now available through Z AI.
+- **⚡ Caveman Prose System Prompts** — Compressed built-in agents, rules, capabilities, and native tool schemas into ultra-terse prose, cutting base prompt token costs by up to 50%.
+- **🎯 Token-Efficient Default Modes** — Streamlined Architect, Code, Ask, Debug, and Orchestrator modes for faster iterations and minimal context usage without losing functionality.
+- **New model** — GLM-5.3-Flash is now available through Z AI (50% discount on Zoo Gateway).
 - **Reliability fixes** — restored subtask approvals, Vertex Gemini 3.7 empty tool output, terminal startup failures, background service errors, and theme legibility.
 
 <details>
